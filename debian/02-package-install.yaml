@@ -1,0 +1,81 @@
+---
+- hosts: all
+  become: true
+  
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - acl
+          - gpg
+        update_cache: true
+        state: present
+    
+    - name: Add PUB_KEY 
+      apt_key:
+        id: 7EA0A9C3F273FCD8
+        keyserver: hkp://pool.sks-keyservers.net:80
+        state: present 
+
+    - name: Add docker repository to apt
+      apt_repository: 
+        repo: deb [arch=arm64] https://download.docker.com/linux/debian buster stable
+        state: present
+
+    - name: Update the repository and install Docker
+      apt:
+        name: 
+          - docker-ce
+          - docker-ce-cli
+        update_cache: true
+        state: present
+
+    - name: Add existing user to docker group
+      user:
+        name: ansible
+        groups: docker
+        append: yes
+
+    - name: Download Kubernetes GPG key
+      get_url:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        dest: /etc/apt/trusted.gpg.d/kubernetes.pgp
+
+    - name: Update PGP keys from Canonical
+      apt_key:
+        id: 6A030B21BA07F4FB
+        keyserver: hkp://keyserver.ubuntu.com:80
+        state: present 
+
+    - name: Add kubernetes repository to apt
+      apt_repository: 
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: Turn off swap
+      command: swapoff -a
+
+    - name: Install Kubernetes Cluster Packages  
+      apt: 
+        name:
+          - kubeadm
+          - kubectl 
+          - kubelet
+        state: present
+
+    - name: Enable service kubelet, and enable persistently
+      service:
+        name: kubelet 
+        enabled: yes
+
+    - name: reboot all kubernetes nodes
+      reboot: 
+        post_reboot_delay: 20
+        reboot_timeout: 60
+        connect_timeout: 60
+        test_command: uptime
+

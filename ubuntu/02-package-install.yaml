@@ -1,0 +1,116 @@
+---
+- hosts: all
+  become: true
+  
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - acl
+          - gpg
+        update_cache: true
+        state: present
+    
+    - name: Download Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        keyring: /etc/apt/trusted.gpg.d/docker-apt-key.gpg
+
+    - name: Add docker repository to apt
+      apt_repository: 
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Update the repository and install Docker
+      apt:
+        name: 
+          - docker-ce
+          - docker-ce-cli
+        update_cache: true
+        state: present
+
+    - name: Add existing user to docker group
+      user:
+        name: ftenario
+        groups: docker
+        append: yes
+
+    - name: Download Kubernetes GPG key
+      get_url:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        dest: /etc/apt/trusted.gpg.d/kubernetes.pgp
+
+    - name: Update PGP keys from Canonical
+      apt_key:
+        id: 6A030B21BA07F4FB
+        keyserver: hkp://keyserver.ubuntu.com:80
+        state: present 
+
+    - name: Add kubernetes repository to apt
+      apt_repository: 
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: Turn off swap
+      command: swapoff -a
+
+    - name: Install Kubernetes Cluster Packages  
+      apt: 
+        name:
+          - kubeadm
+          - kubectl 
+          - kubelet
+        state: present
+
+    - name: Enable service kubelet, and enable persistently
+      service:
+        name: kubelet 
+        enabled: yes
+
+    - name: reboot all kubernetes nodes
+      reboot: 
+        post_reboot_delay: 10
+        reboot_timeout: 60
+        connect_timeout: 60
+        test_command: uptime
+
+# - hosts: master
+#   become: true
+    
+#   tasks:
+    # - name: pull images for cluster
+    #   shell: kubeadm config images pull
+
+    # - name: Initialize the cluster
+    #   shell: kubeadm init --apiserver-advertise-address=192.168.1.130 --pod-network-cidr=10.244.0.0/16
+
+    # - name: create .kube directory
+    #   become: yes
+    #   become_user: ubuntu
+    #   file:
+    #     path: /home/ubuntu/.kube
+    #     state: directory
+    #     mode: 0755
+
+    # - name: check admin.conf exists
+    #   stat:
+    #     path: /etc/kubernetes/admin.conf
+    #   register: k8s_conf
+
+    # - name: copy admin.conf to users .kube config
+    #   copy:
+    #     src: /etc/kubernetes/admin.conf
+    #     dest: /home/ubuntu/.kube/config
+    #     remote_src: yes
+    #     owner: ubuntu
+    #   when: k8s_conf.stat.exists   
+
+    # - name: Install kubeadm addons
+    #   become: yes
+    #   become_user: ubuntu
+    #   shell: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
